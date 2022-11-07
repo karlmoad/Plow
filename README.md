@@ -44,7 +44,7 @@ To see the commit history of the configured branch execute the following command
 $ plow list commits
 ```
 
-
+git 
 ### Validation
 The tool is capable of validating changes to be applied to the target prior to application.  Object specifications 
 can take advantage of validation to apply modifications to an existing object in place of drop and replace actions, 
