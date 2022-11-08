@@ -8,6 +8,7 @@ validation and application phases depending on options configuration within the 
 This object definition style take advantage of using target native SQL commands executed in a defined order.  The 
 scopes execute in the order defined below, if an error occurs during application of a scope all following scopes 
 will be skipped.  Scopes can include multiple commands to be executed, each command should be terminated with a ";" 
+
 character.  
 
 ### Metadata (meta element)
@@ -28,6 +29,7 @@ spec:
 
 
 ### Scopes
+
 
 | Scope / Element Name | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 |:---------------------|:---------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
