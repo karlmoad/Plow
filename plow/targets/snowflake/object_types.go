@@ -22,13 +22,14 @@ const (
 	Task
 	Sequence
 	User
+	Format
 )
 
 func (s SnowflakeObjectType) ToInt64() int64 {
 	return int64(s)
 }
 
-var SnowflakeProcessingOrder = [...]SnowflakeObjectType{Role, Warehouse, Database, Schema, Table, View, Procedure, UserDefinedFunction, ResourceMonitor, Stage, Pipe, Stream, Task, Sequence}
+var SnowflakeProcessingOrder = [...]SnowflakeObjectType{Role, Warehouse, Database, Schema, Table, View, Procedure, UserDefinedFunction, ResourceMonitor, Stage, Pipe, Stream, Task, Sequence, Format}
 
 func StringToSnowflakeObjectTypeInt64(s string) int64 {
 	return int64(StringToSnowflakeObjectType(s))
@@ -70,6 +71,8 @@ func StringToSnowflakeObjectType(s string) SnowflakeObjectType {
 		return Sequence
 	case "user":
 		return User
+	case "format":
+		return Format
 	default:
 		return UnknownType
 	}
