@@ -15,7 +15,7 @@ character.
 The first element of the base object specification is the meta (metadata) structure. This metadata structure 
 identifies the owning role that will be allied to the object within the target.  The owner must be a role, and must be 
 defined and present within the system prior to the execution of the objects specification commands.  Execution 
-order of object types can be seen [here](/objecttypes.md)   
+order of object types can be seen [here](/plow/targets/snowflake/docs/objecttypes.md)   
 
 ```yaml 
 spec:
