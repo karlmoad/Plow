@@ -7,7 +7,7 @@ validation and application phases depending on options configuration within the 
 
 This object definition style take advantage of using target native SQL commands executed in a defined order.  The 
 scopes execute in the order defined below, if an error occurs during application of a scope all following scopes 
-will be skipped.  Scopes can include multiple commands to be executed, each command shoudl be terminated with a ";" 
+will be skipped.  Scopes can include multiple commands to be executed, each command should be terminated with a ";" 
 character.  
 
 ### Metadata (meta element)
@@ -29,21 +29,21 @@ spec:
 
 ### Scopes
 
-| Scope / Element Name | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|:---------------------| :--- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| pre                  | No | If present, command(s) contained within will be applied to the target prior to other scopes within the definition                                                                                                                                                                                                                                                                                                                          |
-| init                 | No | If present, command(s) within this scoep will be executed when the object is deemed to not exist via validation and requires instantiation.  If validation is not configured commands within this scope are executed following any ***pre*** scope commands.                                                                                                                                                                               |
-| change               | No | Command(s) within this scope are intended to make changes to an existsing object's defninition within the target. For this scope to be applied validation must be configured so the objects state of exisstance can be determined.  If validation is not applied this scope will be ignored, Note: all structural mnodification defnined within this scope shoudl also be refected in the ***init*** scope as well for validation purposes |
-| post                 | No | If Present, command(s) within this scope are executed following the application of all other scopes                                                                                                                                                                                                                                                                                                                                        |
+| Scope / Element Name | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|:---------------------| :--- |:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| pre                  | No | If present, command(s) contained within will be applied to the target prior to other scopes within the definition                                                                                                                                                                                                                                                                                                                                    |
+| init                 | No | If present, command(s) within this scoep will be executed when the object is deemed to not exist via validation and requires instantiation.  If validation is not configured commands within this scope are executed following any ***pre*** scope commands.                                                                                                                                                                                         |
+| change               | No | Command(s) within this scope are intended to make changes to an existsing object's defninition within the target. For this scope to be applied validation must be configured so the objects state of exisstance can be determined.  If validation is not applied this scope will be ignored. <br><br> **_Note: all structural modification defnined within this scope shoudl also be refected in the *init* scope as well for validation purposes_** |
+| post                 | No | If Present, command(s) within this scope are executed following the application of all other scopes                                                                                                                                                                                                                                                                                                                                                  |
 
 Commands can be broken into multiple lines for readability by adding the "|" charater and a line feed following the 
 scope element name within the yaml structure.  Please note if the statement contains multiple commands each command 
 must be terminated with a ";" character to avoid error.   
 
-### Variables
+### Scope Command Placeholders
 To provided for the mechanics of the validation system to inject required values to render validation structures, 
-variables are used within the scope command statements to reflect values form the header object name, database, 
-schema settings.  each variable is defined using {{VARIABLE NAME (NAME,DATABASE, or SCHEMA)}} format using all 
+placeholders are used within the scope command statements to reflect values form the header object name, database, 
+schema settings.  each placeholder is defined using {{(NAME,DATABASE, or SCHEMA)}} format using all 
 capital letters, in place of the value.  The system will inject the correct value form the header settings to 
 generate the final desired effect.    
 
