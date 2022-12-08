@@ -3,6 +3,7 @@ package cmd
 import (
 	"Plow/plow"
 	"Plow/plow/objects"
+	"context"
 	"fmt"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -17,7 +18,7 @@ var fastForward bool
 var commitId string
 var environment string
 
-var config plow.Configuration
+var config objects.Configuration
 var options objects.Options
 var operation *plow.Operation
 
@@ -68,7 +69,7 @@ func initializeConfiguration() error {
 		return err
 	}
 
-	var sysConfig plow.SystemConfiguration
+	var sysConfig objects.SystemConfiguration
 	err = yaml.Unmarshal(bytes, &sysConfig)
 	if err != nil {
 		return err
@@ -98,7 +99,12 @@ func initOptions() error {
 }
 
 func initOperation() error {
-	op, err := plow.NewOperation(config, options)
+	ctx, err := objects.NewPlowContext(context.Background(), config, options)
+	if err != nil {
+		return err
+	}
+
+	op, err := plow.NewOperation(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

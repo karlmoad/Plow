@@ -3,7 +3,6 @@ package common
 import (
 	"Plow/plow/objects"
 	"github.com/noirbizarre/gonja"
-	"strings"
 	"time"
 )
 
@@ -40,12 +39,6 @@ func RenderStatement(statement string, context *gonja.Context) (string, error) {
 }
 
 type Renderer interface {
-	Render(change *objects.ChangeItem) ([]*objects.ApplyScope, error)
+	Render(change *objects.ChangeItem, context *objects.PlowContext) ([]*objects.ApplyScope, error)
 	RenderWithContext(change *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error)
-}
-
-func NewRenderContextFromObjectInfo(obj objects.ObjectSpec) *map[string]interface{} {
-	return &map[string]interface{}{"NAME": strings.TrimSpace(strings.ToUpper(obj.Name)),
-		"DATABASE": strings.TrimSpace(strings.ToUpper(obj.Database)),
-		"SCHEMA":   strings.TrimSpace(strings.ToUpper(obj.Schema))}
 }

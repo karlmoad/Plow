@@ -2,7 +2,6 @@ package plow
 
 import (
 	"Plow/plow/objects"
-	"Plow/plow/secrets"
 	"errors"
 	"fmt"
 	"github.com/go-git/go-git/v5"
@@ -24,15 +23,14 @@ var (
 
 type Repo struct {
 	sshKey     *ssh.PublicKeys
-	config     *Configuration
 	repo       *git.Repository
 	primaryRef *plumbing.Reference
-	options    *objects.Options
+	context    *objects.PlowContext
 }
 
 func (r *Repo) memoryClone() (*git.Repository, error) {
 	repo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
-		URL:  r.config.GitConfig.Url,
+		URL:  r.context.Config.GitConfig.Url,
 		Auth: r.sshKey,
 	})
 	if err != nil {
@@ -42,7 +40,7 @@ func (r *Repo) memoryClone() (*git.Repository, error) {
 }
 
 func (r *Repo) GetPrimaryCommitReference() (*plumbing.Reference, error) {
-	if !r.options.OptionFlags.Has(objects.UseLocalRepositorySetting) {
+	if !r.context.Options.OptionFlags.Has(objects.UseLocalRepositorySetting) {
 		return r.repo.Head()
 	} else {
 		return r.primaryRef, nil
@@ -51,7 +49,7 @@ func (r *Repo) GetPrimaryCommitReference() (*plumbing.Reference, error) {
 
 func (r *Repo) Clone(directory string) (*git.Repository, error) {
 	repo, err := git.PlainClone(directory, false, &git.CloneOptions{
-		URL:  r.config.GitConfig.Url,
+		URL:  r.context.Config.GitConfig.Url,
 		Auth: r.sshKey,
 	})
 
@@ -120,8 +118,8 @@ func (r *Repo) GetCommitHistory(reference *plumbing.Reference) ([]*object.Commit
 	return out, nil
 }
 
-func newLocalRepo(config *Configuration, options *objects.Options, secrets secrets.SecretStore) (*Repo, error) {
-	r := &Repo{config: config, options: options}
+func newLocalRepo(context *objects.PlowContext) (*Repo, error) {
+	r := &Repo{context: context}
 	dir, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -135,17 +133,17 @@ func newLocalRepo(config *Configuration, options *objects.Options, secrets secre
 	return r, nil
 }
 
-func newMemoryRepo(config *Configuration, options *objects.Options, secrets secrets.SecretStore) (*Repo, error) {
+func newMemoryRepo(context *objects.PlowContext) (*Repo, error) {
 	//establishes a new fresh memory based clone of github repo
 
-	r := &Repo{config: config, options: options}
+	r := &Repo{context: context}
 
-	sshpwd, err := secrets.GetSecret(config.GitConfig.KeyPasswordSecret)
+	sshpwd, err := r.context.SecretStore.GetSecret(r.context.Config.GitConfig.KeyPasswordSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	sshkey, _ := os.ReadFile(r.config.GitConfig.SSHKeyFile)
+	sshkey, _ := os.ReadFile(r.context.Config.GitConfig.SSHKeyFile)
 	keys, err := ssh.NewPublicKeys("git", []byte(sshkey), sshpwd) //pwd form secrets
 	if err != nil {
 		return nil, err
@@ -159,7 +157,7 @@ func newMemoryRepo(config *Configuration, options *objects.Options, secrets secr
 	}
 	r.repo = repo
 
-	err = r.SetBranchReference(config.GitConfig.Branch)
+	err = r.SetBranchReference(r.context.Config.GitConfig.Branch)
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +204,8 @@ func (r *Repo) BuildChangeLog(log *objects.TrackingLog, translator objects.Objec
 	var last *object.Commit
 
 	//if this is a fast forward or single file execution ignore tracking history
-	if !r.options.OptionFlags.Has(objects.SingleFileChangeSetting) &&
-		!r.options.OptionFlags.Has(objects.FastForwardSetting) {
+	if !r.context.Options.OptionFlags.Has(objects.SingleFileChangeSetting) &&
+		!r.context.Options.OptionFlags.Has(objects.FastForwardSetting) {
 
 		lastTracked := log.GetLastProcessed()
 		if lastTracked == nil {
@@ -231,7 +229,7 @@ func (r *Repo) BuildChangeLog(log *objects.TrackingLog, translator objects.Objec
 		return nil, ErrNoCommitsToProcess
 	}
 
-	if !r.options.OptionFlags.Has(objects.FastForwardSetting) {
+	if !r.context.Options.OptionFlags.Has(objects.FastForwardSetting) {
 		if last == nil {
 			//just in case this has not been evaluated prior
 			return nil, ErrNoLastCommitFound
@@ -333,7 +331,7 @@ func (r *Repo) buildWorkList(last *object.Commit) ([]*object.Commit, error) {
 		return nil, err
 	}
 
-	targetCommit, err := r.options.EvaluateTargetCommit(commits)
+	targetCommit, err := r.context.Options.EvaluateTargetCommit(commits)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +341,7 @@ func (r *Repo) buildWorkList(last *object.Commit) ([]*object.Commit, error) {
 	}
 
 	//IF NOT FAST FORWARD
-	if !r.options.OptionFlags.Has(objects.FastForwardSetting) {
+	if !r.context.Options.OptionFlags.Has(objects.FastForwardSetting) {
 		if last == nil {
 			return nil, ErrNoLastCommitFound
 		}

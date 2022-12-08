@@ -2,7 +2,6 @@ package plow
 
 import (
 	"Plow/plow/objects"
-	"Plow/plow/secrets"
 	"Plow/plow/targets"
 	"Plow/plow/targets/common"
 	"context"
@@ -10,22 +9,15 @@ import (
 )
 
 type Operation struct {
-	config  Configuration
-	options objects.Options
+	context *objects.PlowContext
 	target  common.Target
 	repo    *Repo
 }
 
-func NewOperation(config Configuration, options objects.Options) (*Operation, error) {
-	operation := &Operation{config: config, options: options}
+func NewOperation(context *objects.PlowContext) (*Operation, error) {
+	operation := &Operation{context: context}
 
-	//unpack config and init secret store and target
-	//secret store
-	secretStr, err := secrets.InitKeyVault(config.SecretStoreType, config.SecretStore)
-	if err != nil {
-		return nil, err
-	}
-	target, err := targets.NewTarget(config.TargetType, config.Target, &operation.options, secretStr)
+	target, err := targets.NewTarget(context.Config.TargetType, context)
 	if err != nil {
 		return nil, err
 	}
@@ -33,10 +25,10 @@ func NewOperation(config Configuration, options objects.Options) (*Operation, er
 
 	var repo *Repo
 	//init repo instance
-	if !options.OptionFlags.Has(objects.UseLocalRepositorySetting) {
-		repo, err = newMemoryRepo(&operation.config, &operation.options, secretStr)
+	if !operation.context.Options.OptionFlags.Has(objects.UseLocalRepositorySetting) {
+		repo, err = newMemoryRepo(operation.context)
 	} else {
-		repo, err = newLocalRepo(&operation.config, &operation.options, secretStr)
+		repo, err = newLocalRepo(operation.context)
 	}
 
 	if err != nil {
@@ -56,10 +48,10 @@ func (o *Operation) Repository() *Repo {
 }
 
 func (o *Operation) GenerateChangeLog() (*objects.ChangeLog, error) {
-	if o.options.IsFileProvided() {
+	if o.context.Options.IsFileProvided() {
 		changes := objects.NewChangeLog(o.target.GetObjectTypeTranslator())
 		bundle := changes.AddManualBundle()
-		err := bundle.AddItem(o.options.File.Bytes, objects.NewChangeMetaFromOptions(&o.options))
+		err := bundle.AddItem(o.context.Options.File.Bytes, objects.NewChangeMetaFromOptions(&o.context.Options))
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +70,7 @@ func (o *Operation) listRepositoryChanges() (*objects.ChangeLog, error) {
 }
 
 func (o *Operation) ValidateChanges(changes *objects.ChangeLog) error {
-	if o.options.OptionFlags.Has(objects.SkipValidationSetting) {
+	if o.context.Options.OptionFlags.Has(objects.SkipValidationSetting) {
 		return errors.New("cannot validate changes, skip validation option was set")
 	}
 
@@ -90,7 +82,7 @@ func (o *Operation) ValidateChanges(changes *objects.ChangeLog) error {
 }
 
 func (o *Operation) RenderChanges(changes *objects.ChangeLog) ([]*common.RenderedChange, error) {
-	if !o.options.OptionFlags.Has(objects.SkipValidationSetting) {
+	if !o.context.Options.OptionFlags.Has(objects.SkipValidationSetting) {
 		err := o.ValidateChanges(changes)
 		if err != nil {
 			return nil, err
@@ -100,7 +92,7 @@ func (o *Operation) RenderChanges(changes *objects.ChangeLog) ([]*common.Rendere
 }
 
 func (o *Operation) ApplyChanges(context context.Context, changes *objects.ChangeLog) error {
-	if !o.options.OptionFlags.Has(objects.SkipValidationSetting) {
+	if !o.context.Options.OptionFlags.Has(objects.SkipValidationSetting) {
 		err := o.ValidateChanges(changes)
 		if err != nil {
 			return err

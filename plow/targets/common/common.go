@@ -34,6 +34,7 @@ const (
 )
 
 type Target interface {
+	Open(context *objects.PlowContext) error
 	PersistTrackingLogDetail(detail *objects.LogItemEntry) error
 	PersistTrackingLogEntry(entry *objects.LogEntry) error
 	GetTrackingHistory(depth int) (*objects.TrackingLog, error)

@@ -38,7 +38,7 @@ func (sfr *SnowflakeRenderer) GetWarehouseCoordinator() *WarehouseUnitCoordinato
 	return sfr.warehouseCoordinator
 }
 
-func (sfr *SnowflakeRenderer) RenderWithContext(change *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) RenderWithContext(change *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 
 	switch StringToSnowflakeObjectType(change.Item.Type) {
 	case Role:
@@ -94,11 +94,15 @@ func (sfr *SnowflakeRenderer) RenderWithContext(change *objects.ChangeItem, para
 	}
 }
 
-func (sfr *SnowflakeRenderer) Render(change *objects.ChangeItem) ([]*objects.ApplyScope, error) {
-	return sfr.RenderWithContext(change, common.NewRenderContextFromObjectInfo(change.Item.Object))
+func (sfr *SnowflakeRenderer) Render(change *objects.ChangeItem, context *objects.PlowContext) ([]*objects.ApplyScope, error) {
+	params, err := change.Item.ExtractVariableValues(context)
+	if err != nil {
+		return nil, err
+	}
+	return sfr.RenderWithContext(change, params)
 }
 
-func (sfr *SnowflakeRenderer) renderRoleSpec(spec *sfRoleSpecification, item *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) renderRoleSpec(spec *sfRoleSpecification, item *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 	stmts := make([]string, 0)
 	stmts = append(stmts, generateUseRoleStmt(string(SECURITYADMIN)))
 
@@ -178,9 +182,9 @@ func (sfr *SnowflakeRenderer) renderRoleSpec(spec *sfRoleSpecification, item *ob
 	return []*objects.ApplyScope{common.NewScope("role", stmts)}, nil
 }
 
-func (sfr *SnowflakeRenderer) renderDatabaseSpec(spec *sfDatabaseSpecification, item *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) renderDatabaseSpec(spec *sfDatabaseSpecification, item *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 	stmts := make([]string, 0)
-	vars := *params
+	vars := params
 
 	sfr.addOwnerToWarehouseCoordinator(spec.Owner)
 
@@ -237,7 +241,7 @@ func (sfr *SnowflakeRenderer) renderDatabaseSpec(spec *sfDatabaseSpecification, 
 
 		//process grants
 		for _, grant := range spec.Usage.Grants {
-			variables := utility.DeepMapCopy(*params)
+			variables := utility.DeepMapCopy(params)
 
 			var stmt string
 			switch StringToSnowflakeObjectType(grant.ObjectType) {
@@ -263,7 +267,7 @@ func (sfr *SnowflakeRenderer) renderDatabaseSpec(spec *sfDatabaseSpecification, 
 
 		//process revokes
 		for _, revoke := range spec.Usage.Revokes {
-			variables := utility.DeepMapCopy(*params)
+			variables := utility.DeepMapCopy(params)
 
 			var stmt string
 			switch StringToSnowflakeObjectType(revoke.ObjectType) {
@@ -290,9 +294,9 @@ func (sfr *SnowflakeRenderer) renderDatabaseSpec(spec *sfDatabaseSpecification, 
 	return []*objects.ApplyScope{common.NewScope("database", stmts)}, nil
 }
 
-func (sfr *SnowflakeRenderer) renderSchemaSpec(spec *sfSchemaSpecification, item *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) renderSchemaSpec(spec *sfSchemaSpecification, item *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 	stmts := make([]string, 0)
-	vars := *params
+	vars := params
 
 	sfr.addOwnerToWarehouseCoordinator(spec.Owner)
 
@@ -333,7 +337,7 @@ func (sfr *SnowflakeRenderer) renderSchemaSpec(spec *sfSchemaSpecification, item
 
 		//process grants
 		for _, grant := range spec.Usage.Grants {
-			variables := utility.DeepMapCopy(*params)
+			variables := utility.DeepMapCopy(params)
 
 			var stmt string
 			switch StringToSnowflakeObjectType(grant.ObjectType) {
@@ -359,7 +363,7 @@ func (sfr *SnowflakeRenderer) renderSchemaSpec(spec *sfSchemaSpecification, item
 
 		//process revokes
 		for _, revoke := range spec.Usage.Revokes {
-			variables := utility.DeepMapCopy(*params)
+			variables := utility.DeepMapCopy(params)
 
 			var stmt string
 			switch StringToSnowflakeObjectType(revoke.ObjectType) {
@@ -387,7 +391,7 @@ func (sfr *SnowflakeRenderer) renderSchemaSpec(spec *sfSchemaSpecification, item
 	return []*objects.ApplyScope{common.NewScope("schema", stmts)}, nil
 }
 
-func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, item *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, item *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 	out := make([]*objects.ApplyScope, 0)
 	var err error
 	var scope *objects.ApplyScope
@@ -411,7 +415,8 @@ func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, it
 
 	//pre scope statements are always applied if present in the spec
 	if !utility.IsStringEmpty(&spec.Pre) {
-		if scope, err = renderSpecStatement(spec.Pre, "pre", (*gonja.Context)(params)); err == nil {
+		gc := gonja.Context(params)
+		if scope, err = renderSpecStatement(spec.Pre, "pre", &gc); err == nil {
 			out = append(out, scope)
 		} else {
 			return nil, err
@@ -428,14 +433,16 @@ func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, it
 	if initPresent {
 		if item.ExistsFlag {
 			if changePresent {
-				if scope, err = renderSpecStatement(spec.Change, "change", (*gonja.Context)(params)); err == nil {
+				gc := gonja.Context(params)
+				if scope, err = renderSpecStatement(spec.Change, "change", &gc); err == nil {
 					out = append(out, scope)
 				} else {
 					return nil, err
 				}
 			}
 		} else {
-			if scope, err = renderSpecStatement(spec.Init, "init", (*gonja.Context)(params)); err == nil {
+			gc := gonja.Context(params)
+			if scope, err = renderSpecStatement(spec.Init, "init", &gc); err == nil {
 				out = append(out, scope)
 			} else {
 				return nil, err
@@ -445,7 +452,8 @@ func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, it
 
 	//post scope statements are always applied if present in the spec
 	if !utility.IsStringEmpty(&spec.Post) {
-		if scope, err = renderSpecStatement(spec.Post, "post", (*gonja.Context)(params)); err == nil {
+		gc := gonja.Context(params)
+		if scope, err = renderSpecStatement(spec.Post, "post", &gc); err == nil {
 			out = append(out, scope)
 		} else {
 			return nil, err
@@ -455,7 +463,7 @@ func (sfr *SnowflakeRenderer) renderDefaultSpec(spec *sfDefaultSpecification, it
 	return out, nil
 }
 
-func (sfr *SnowflakeRenderer) renderWarehouseSpec(spec *sfWarehouseSpecification, item *objects.ChangeItem, params *map[string]interface{}) ([]*objects.ApplyScope, error) {
+func (sfr *SnowflakeRenderer) renderWarehouseSpec(spec *sfWarehouseSpecification, item *objects.ChangeItem, params map[string]interface{}) ([]*objects.ApplyScope, error) {
 	stmts := make([]string, 0)
 
 	sfr.addOwnerToWarehouseCoordinator(spec.Owner)
@@ -466,7 +474,7 @@ func (sfr *SnowflakeRenderer) renderWarehouseSpec(spec *sfWarehouseSpecification
 	//process usage grants/revokes
 	//process grants
 	for _, grant := range spec.Usage.Grants {
-		variables := utility.DeepMapCopy(*params)
+		variables := utility.DeepMapCopy(params)
 
 		var stmt string
 		switch StringToSnowflakeObjectType(grant.ObjectType) {
@@ -492,7 +500,7 @@ func (sfr *SnowflakeRenderer) renderWarehouseSpec(spec *sfWarehouseSpecification
 
 	//process revokes
 	for _, revoke := range spec.Usage.Revokes {
-		variables := utility.DeepMapCopy(*params)
+		variables := utility.DeepMapCopy(params)
 
 		var stmt string
 		switch StringToSnowflakeObjectType(revoke.ObjectType) {

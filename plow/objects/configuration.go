@@ -1,4 +1,4 @@
-package plow
+package objects
 
 type DirectoryType int
 
@@ -20,6 +20,7 @@ type Configuration struct {
 	SecretStore     map[string]interface{} `yaml:"secretStore"`
 	Target          map[string]interface{} `yaml:"target"`
 	GitConfig       GitConfiguration       `yaml:"git"`
+	Vars            map[string]interface{} `yaml:"vars"`
 }
 
 type SystemConfiguration struct {

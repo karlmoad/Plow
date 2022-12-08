@@ -2,13 +2,13 @@ package snowflake
 
 import (
 	"Plow/plow/objects"
-	"Plow/plow/secrets"
 	"Plow/plow/targets/common"
 	"context"
 	"database/sql"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/mitchellh/mapstructure"
 	"github.com/noirbizarre/gonja"
 	sf "github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
@@ -18,23 +18,29 @@ import (
 )
 
 type SnowflakeTarget struct {
-	connection  *sql.DB
-	config      sf.Config
-	secretStore secrets.SecretStore
-	validation  *common.ValidationHandler
-	options     *objects.Options
-	renderer    *SnowflakeRenderer
+	connection *sql.DB
+	config     sf.Config
+	validation *common.ValidationHandler
+	renderer   *SnowflakeRenderer
+	context    *objects.PlowContext
 }
 
-func (s *SnowflakeTarget) Open(config SnowflakeConfiguration, options *objects.Options, secretStore secrets.SecretStore) error {
-	if IsProtectedSystemRole(config.Role) {
+func (s *SnowflakeTarget) Open(context *objects.PlowContext) error {
+
+	var sfcfg SnowflakeConfiguration
+	err := mapstructure.Decode(context.Config.Target, &sfcfg)
+	if err != nil {
+		return err
+	}
+
+	if IsProtectedSystemRole(sfcfg.Role) {
 		return ErrDisallowedPrivilegedRole
 	}
 
-	s.renderer = newSnowflakeRenderer(config.Role, config.Warehouse)
-	s.options = options
-	pkeyFile := config.PublicKeyFile
-	s.secretStore = secretStore
+	s.renderer = newSnowflakeRenderer(sfcfg.Role, sfcfg.Warehouse)
+	s.context = context
+	pkeyFile := sfcfg.PublicKeyFile
+
 	bytes, err := os.ReadFile(pkeyFile)
 	if err != nil {
 		return err
@@ -42,7 +48,7 @@ func (s *SnowflakeTarget) Open(config SnowflakeConfiguration, options *objects.O
 
 	block, _ := pem.Decode(bytes)
 
-	pwd, err := secretStore.GetSecret(config.KeyPasswordSecret)
+	pwd, err := s.context.SecretStore.GetSecret(sfcfg.KeyPasswordSecret)
 	if err != nil {
 		return err
 	}
@@ -55,12 +61,12 @@ func (s *SnowflakeTarget) Open(config SnowflakeConfiguration, options *objects.O
 	s.config = sf.Config{
 		Authenticator: sf.AuthTypeJwt,
 		PrivateKey:    pkey,
-		User:          config.UserId,
-		Account:       config.Account,
-		Region:        config.Region,
-		Database:      config.Database,
-		Warehouse:     config.Warehouse,
-		Role:          config.Role}
+		User:          sfcfg.UserId,
+		Account:       sfcfg.Account,
+		Region:        sfcfg.Region,
+		Database:      sfcfg.Database,
+		Warehouse:     sfcfg.Warehouse,
+		Role:          sfcfg.Role}
 
 	dsn, err := sf.DSN(&s.config)
 	if err != nil {
@@ -130,7 +136,7 @@ func (s *SnowflakeTarget) RenderChangeLog(changes *objects.ChangeLog) ([]*common
 	}
 	renderedChanges := make([]*common.RenderedChange, 0)
 
-	validationDisabled := s.options.OptionFlags.Has(objects.SkipValidationSetting)
+	validationDisabled := s.context.Options.OptionFlags.Has(objects.SkipValidationSetting)
 	//for each bundle in order
 	for _, bundle := range changes.Bundles {
 
@@ -255,7 +261,7 @@ func (s *SnowflakeTarget) ApplyChangeLog(context context.Context, changes *objec
 			SuccessfulChanges: success,
 			FailedChanges:     failed,
 			Completed:         true,
-			FastForward:       s.options.OptionFlags.Has(objects.FastForwardSetting),
+			FastForward:       s.context.Options.OptionFlags.Has(objects.FastForwardSetting),
 		}
 
 		// log bundle to tracking
@@ -273,7 +279,7 @@ func (s *SnowflakeTarget) renderChange(item *objects.ChangeItem) *common.Rendere
 
 	scopes := []*objects.ApplyScope{common.NewScope("header", []string{generateUseRoleStmt(s.config.Role)})}
 	//render scopes for the item, if error: add error info to item and return
-	rScopes, err := s.renderer.Render(item)
+	rScopes, err := s.renderer.Render(item, s.context)
 	if err != nil {
 		item.ApplyInformation.Executed = false
 		item.ApplyInformation.Completed = false
