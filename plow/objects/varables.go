@@ -51,3 +51,8 @@ type ConfigVariableMapDefinition struct {
 type VariableDefinitionSet struct {
 	Variables map[string]interface{} `yaml:"vars"`
 }
+
+type ValueBinding struct {
+	Value    interface{} `yaml:"value,omitempty"`
+	Variable string      `yaml:"var,omitempty"`
+}
